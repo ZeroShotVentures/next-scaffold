@@ -6,34 +6,28 @@ import { env } from "@/env";
 import { type PlanName, subscriptionPlans } from "./plans";
 import { prisma } from "./prisma";
 
-const stripeClient = new Stripe(env.STRIPE_SECRET_KEY, {
-  apiVersion: "2026-08-26.dahlia",
-});
+const billingPlugins = () => {
+  if (!env.BILLING_ENABLED) return [];
 
-const stripePrices: Record<
-  PlanName,
-  { priceId: string; annualDiscountPriceId?: string }
-> = {
-  basic: {
-    priceId: env.STRIPE_PRICE_BASIC_MONTHLY,
-    annualDiscountPriceId: env.STRIPE_PRICE_BASIC_ANNUAL,
-  },
-  pro: {
-    priceId: env.STRIPE_PRICE_PRO_MONTHLY,
-    annualDiscountPriceId: env.STRIPE_PRICE_PRO_ANNUAL,
-  },
-};
+  const stripeClient = new Stripe(env.STRIPE_SECRET_KEY, {
+    apiVersion: "2026-08-26.dahlia",
+  });
 
-export const auth = betterAuth({
-  secret: env.BETTER_AUTH_SECRET,
-  baseURL: env.BETTER_AUTH_URL,
-  database: prismaAdapter(prisma, {
-    provider: "postgresql",
-  }),
-  emailAndPassword: {
-    enabled: true,
-  },
-  plugins: [
+  const stripePrices: Record<
+    PlanName,
+    { priceId: string; annualDiscountPriceId?: string }
+  > = {
+    basic: {
+      priceId: env.STRIPE_PRICE_BASIC_MONTHLY,
+      annualDiscountPriceId: env.STRIPE_PRICE_BASIC_ANNUAL,
+    },
+    pro: {
+      priceId: env.STRIPE_PRICE_PRO_MONTHLY,
+      annualDiscountPriceId: env.STRIPE_PRICE_PRO_ANNUAL,
+    },
+  };
+
+  return [
     stripe({
       stripeClient,
       stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET,
@@ -48,5 +42,17 @@ export const auth = betterAuth({
         })),
       },
     }),
-  ],
+  ];
+};
+
+export const auth = betterAuth({
+  secret: env.BETTER_AUTH_SECRET,
+  baseURL: env.BETTER_AUTH_URL,
+  database: prismaAdapter(prisma, {
+    provider: "postgresql",
+  }),
+  emailAndPassword: {
+    enabled: true,
+  },
+  plugins: billingPlugins(),
 });
