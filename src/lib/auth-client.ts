@@ -1,7 +1,7 @@
 "use client";
 
-import { createAuthClient } from "better-auth/react";
 import { stripeClient } from "@better-auth/stripe/client";
+import { createAuthClient } from "better-auth/react";
 
 export const authClient = createAuthClient({
   plugins: [
@@ -11,5 +11,4 @@ export const authClient = createAuthClient({
   ],
 });
 
-export const { signIn, signUp, signOut, useSession, subscription } =
-  authClient;
+export const { signIn, signUp, signOut, useSession, subscription } = authClient;
