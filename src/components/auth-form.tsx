@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { signIn, signUp } from "@/src/lib/auth-client";
+import { signIn, signUp } from "@/lib/auth-client";
 
 type AuthFormProps = {
   isSignUp: boolean;

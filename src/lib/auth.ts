@@ -2,7 +2,7 @@ import { stripe } from "@better-auth/stripe";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { Stripe } from "stripe";
-import { env } from "@/src/env";
+import { env } from "@/env";
 import { type PlanName, subscriptionPlans } from "./plans";
 import { prisma } from "./prisma";
 

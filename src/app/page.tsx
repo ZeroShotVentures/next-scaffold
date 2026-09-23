@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useSession } from "@/src/lib/auth-client";
-import { AuthForm } from "./components/auth-form";
-import { Dashboard } from "./components/dashboard";
+import { AuthForm } from "@/components/auth-form";
+import { Dashboard } from "@/components/dashboard";
+import { useSession } from "@/lib/auth-client";
 
 export default function Home() {
   const { data: session, isPending } = useSession();

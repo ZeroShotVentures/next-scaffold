@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { signOut, subscription } from "@/src/lib/auth-client";
-import { type SubscriptionPlan, subscriptionPlans } from "@/src/lib/plans";
+import { signOut, subscription } from "@/lib/auth-client";
+import { type SubscriptionPlan, subscriptionPlans } from "@/lib/plans";
 
 type SessionLike = {
   user: {

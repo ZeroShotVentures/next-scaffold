@@ -14,7 +14,7 @@ const { signIn, signUp } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/src/lib/auth-client", () => ({ signIn, signUp }));
+vi.mock("@/lib/auth-client", () => ({ signIn, signUp }));
 
 describe("AuthForm", () => {
   beforeEach(() => {
