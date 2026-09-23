@@ -2,6 +2,7 @@ import { stripe } from "@better-auth/stripe";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
+import { admin } from "better-auth/plugins";
 import { Stripe } from "stripe";
 import { env } from "@/env";
 import { sendEmail } from "./email";
@@ -119,13 +120,21 @@ export const auth = betterAuth({
     },
     deleteUser: {
       enabled: true,
-      beforeDelete: async (user) => {
-        await cancelSubscriptions(user.id);
-      },
-      afterDelete: async (user) => {
-        await prisma.subscription.deleteMany({
-          where: { referenceId: user.id },
-        });
+    },
+  },
+  // Database hooks (unlike user.deleteUser hooks) also run when an admin
+  // removes a user.
+  databaseHooks: {
+    user: {
+      delete: {
+        before: async (user) => {
+          await cancelSubscriptions(user.id);
+        },
+        after: async (user) => {
+          await prisma.subscription.deleteMany({
+            where: { referenceId: user.id },
+          });
+        },
       },
     },
   },
@@ -139,5 +148,9 @@ export const auth = betterAuth({
         }
       : undefined,
   // nextCookies must stay last so it sees cookies set by the other plugins.
-  plugins: [...billingPlugins(), nextCookies()],
+  plugins: [
+    ...billingPlugins(),
+    admin({ impersonationSessionDuration: 60 * 60 }),
+    nextCookies(),
+  ],
 });

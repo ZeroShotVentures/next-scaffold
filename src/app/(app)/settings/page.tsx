@@ -29,7 +29,11 @@ export default async function Page() {
       select: { providerId: true },
     }),
     prisma.session.findMany({
-      where: { userId: user.id, expiresAt: { gt: new Date() } },
+      where: {
+        userId: user.id,
+        expiresAt: { gt: new Date() },
+        impersonatedBy: null,
+      },
       select: { id: true, userAgent: true, ipAddress: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     }),

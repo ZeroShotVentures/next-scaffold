@@ -60,11 +60,13 @@ All variables are declared and validated in `src/env.ts`. The app refuses to bui
 | `/sign-in`, `/sign-up` | Public. Signed-in users are redirected to `callbackURL` (default `/dashboard`). |
 | `/forgot-password`, `/reset-password` | Public, only when email is enabled. |
 | `/dashboard`, `/settings` | Signed-in users. Grouped under `src/app/(app)` with a shared header. |
+| `/admin`, `/admin/users/[id]` | Admins only. Everyone else gets a 404. See [Admin portal](#admin-portal). |
 
 Protect data on the server, not in the browser:
 
 - **`requireSession()`** from `@/lib/session` returns the session or redirects to `/sign-in`. Call it at the top of every page, Server Action and Route Handler that needs a user. `getSession()` returns `null` instead of redirecting. Both are cached per request.
-- **`src/proxy.ts`** (Next.js 16's replacement for middleware) redirects signed-out visitors of `/dashboard` and `/settings` to `/sign-in?callbackURL=...`. It only checks that a session cookie exists, so it's a UX shortcut, not a security boundary. Add new protected paths to its `matcher`, and still call `requireSession()` in the page.
+- **`requireAdmin()`** does the same and additionally 404s for non-admins. Use it for admin-only pages and Server Actions.
+- **`src/proxy.ts`** (Next.js 16's replacement for middleware) redirects signed-out visitors of `/dashboard`, `/settings` and `/admin` to `/sign-in?callbackURL=...`. It only checks that a session cookie exists, so it's a UX shortcut, not a security boundary. Add new protected paths to its `matcher`, and still call `requireSession()` in the page.
 - Don't put auth checks in layouts: they don't re-run on client navigation.
 - `callbackURL` is validated by `safeRedirect` in `src/lib/redirect.ts`, which only allows same-origin paths.
 
@@ -77,6 +79,33 @@ Protect data on the server, not in the browser:
 - Change their password (only for users who have one). This signs out their other devices.
 - See active sessions and revoke one or all other devices.
 - Delete their account. Password users must enter their password; Google-only users must have signed in within the last day. When billing is enabled, active Stripe subscriptions are canceled immediately (no refund) before the user is deleted, since the Stripe plugin doesn't do this and Stripe would keep charging.
+
+## Admin portal
+
+Built on the Better Auth [admin plugin](https://www.better-auth.com/docs/plugins/admin). Pages read data through `auth.api.*` and the forms call `authClient.admin.*`, so every action is permission-checked by Better Auth itself. Admins get an "Admin" link in the header.
+
+`/admin` lists users (newest first, searchable by email). `/admin/users/[id]` lets an admin:
+
+- **Impersonate** the user. The admin is signed in as them for up to an hour, with a banner and a "Stop impersonating" button that returns to the admin session. Impersonation sessions are hidden from the user's own session list. Other admins can't be impersonated.
+- Change their **role** (`user` or `admin`).
+- **Ban** them for a set time or permanently, with a reason. Banning signs them out everywhere and blocks sign-in until the ban is lifted or expires.
+- See and revoke their **sessions**.
+- Set a new **password**, or give a Google-only user one.
+- **Delete** them. When billing is enabled, active Stripe subscriptions are canceled first, same as self-service deletion (the cleanup runs in a `databaseHooks.user.delete` hook, which covers both paths).
+
+Admins can't take these actions on their own account.
+
+### Creating the first admin
+
+Better Auth only lets admins assign roles, so promote the first one from the command line after they sign up:
+
+```bash
+pnpm admin:grant you@example.com
+```
+
+It reads `DATABASE_URL` the same way the Prisma CLI does (`.env`, then `.env.example`); for production, run it with `DATABASE_URL` pointing at the production database. Further admins can be promoted from the portal.
+
+To add finer-grained roles (e.g. support staff who can impersonate but not delete), define them with `createAccessControl` and pass `ac`/`roles` to both `admin()` in `src/lib/auth.ts` and `adminClient()` in `src/lib/auth-client.ts`.
 
 ## Rate limiting
 
@@ -196,6 +225,7 @@ Stripe keeps charging active subscriptions after you disable billing, but the we
 | `pnpm db:push` | Push the schema without a migration (prototyping only) |
 | `pnpm db:studio` | Open Prisma Studio |
 | `pnpm db:generate` | Regenerate the Prisma client (also runs on install) |
+| `pnpm admin:grant <email>` | Make an existing user an admin |
 
 The pre-commit hook runs oxlint and Biome on staged files.
 
@@ -221,11 +251,13 @@ prisma/
 src/
   app/
     (auth)/            sign-in, sign-up, password reset
-    (app)/             signed-in pages: dashboard, settings
+    (app)/             signed-in pages: dashboard, settings, admin
     api/auth/          Better Auth handler
   components/          React components (+ colocated tests)
   lib/                 auth, session helpers, entitlements, email, plans, Prisma client
   proxy.ts             optimistic redirect for signed-out visitors
+scripts/
+  grant-admin.mts      promote the first admin
   env.ts               environment schema
   generated/prisma/    generated Prisma client (gitignored)
 ```
