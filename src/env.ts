@@ -48,6 +48,16 @@ export const env = createEnv({
     GOOGLE_CLIENT_SECRET: z.string().optional(),
     RESEND_API_KEY: z.string().startsWith("re_").optional(),
     EMAIL_FROM: z.string().min(1),
+    ADMIN_EMAILS: z
+      .string()
+      .optional()
+      .transform((value) =>
+        (value ?? "")
+          .split(",")
+          .map((email) => email.trim().toLowerCase())
+          .filter(Boolean),
+      )
+      .pipe(z.array(z.email())),
   },
   client: {},
   experimental__runtimeEnv: {},

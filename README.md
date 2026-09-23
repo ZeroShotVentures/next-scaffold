@@ -48,6 +48,7 @@ All variables are declared and validated in `src/env.ts`. The app refuses to bui
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth client. Sign in with Google is enabled when both are set. |
 | `RESEND_API_KEY` | Resend API key (`re_...`). Without it, emails are logged to the console in development and email features are disabled in production. |
 | `EMAIL_FROM` | Sender for outgoing email, e.g. `my-app <hello@example.com>`. Must use a domain verified in Resend. |
+| `ADMIN_EMAILS` | Optional, comma-separated. The only way to make someone an admin: listed accounts are admins once their email is verified, everyone else is a regular user. |
 | `BILLING_ENABLED` | `true` to enable Stripe subscriptions. Defaults to `false`. |
 | `STRIPE_SECRET_KEY` | Stripe secret key (`sk_...`). Required when billing is enabled. |
 | `STRIPE_WEBHOOK_SECRET` | Webhook signing secret (`whsec_...`). Required when billing is enabled. |
@@ -60,11 +61,13 @@ All variables are declared and validated in `src/env.ts`. The app refuses to bui
 | `/sign-in`, `/sign-up` | Public. Signed-in users are redirected to `callbackURL` (default `/dashboard`). |
 | `/forgot-password`, `/reset-password` | Public, only when email is enabled. |
 | `/dashboard`, `/settings` | Signed-in users. Grouped under `src/app/(app)` with a shared header. |
+| `/admin`, `/admin/users/[id]` | Admins only. Everyone else gets a 404. See [Admin portal](#admin-portal). |
 
 Protect data on the server, not in the browser:
 
 - **`requireSession()`** from `@/lib/session` returns the session or redirects to `/sign-in`. Call it at the top of every page, Server Action and Route Handler that needs a user. `getSession()` returns `null` instead of redirecting. Both are cached per request.
-- **`src/proxy.ts`** (Next.js 16's replacement for middleware) redirects signed-out visitors of `/dashboard` and `/settings` to `/sign-in?callbackURL=...`. It only checks that a session cookie exists, so it's a UX shortcut, not a security boundary. Add new protected paths to its `matcher`, and still call `requireSession()` in the page.
+- **`requireAdmin()`** does the same and additionally 404s for non-admins. Use it for admin-only pages and Server Actions.
+- **`src/proxy.ts`** (Next.js 16's replacement for middleware) redirects signed-out visitors of `/dashboard`, `/settings` and `/admin` to `/sign-in?callbackURL=...`. It only checks that a session cookie exists, so it's a UX shortcut, not a security boundary. Add new protected paths to its `matcher`, and still call `requireSession()` in the page.
 - Don't put auth checks in layouts: they don't re-run on client navigation.
 - `callbackURL` is validated by `safeRedirect` in `src/lib/redirect.ts`, which only allows same-origin paths.
 
@@ -77,6 +80,30 @@ Protect data on the server, not in the browser:
 - Change their password (only for users who have one). This signs out their other devices.
 - See active sessions and revoke one or all other devices.
 - Delete their account. Password users must enter their password; Google-only users must have signed in within the last day. When billing is enabled, active Stripe subscriptions are canceled immediately (no refund) before the user is deleted, since the Stripe plugin doesn't do this and Stripe would keep charging.
+
+## Admin portal
+
+Built on the Better Auth [admin plugin](https://www.better-auth.com/docs/plugins/admin). Pages read data through `auth.api.*` and the forms call `authClient.admin.*`, so every action is permission-checked by Better Auth itself. Admins get an "Admin" link in the header.
+
+`/admin` lists users (newest first, searchable by email). `/admin/users/[id]` lets an admin:
+
+- **Impersonate** the user. The admin is signed in as them for up to an hour, with a banner and a "Stop impersonating" button that returns to the admin session. Impersonation sessions are hidden from the user's own session list. Other admins can't be impersonated.
+- **Ban** them for a set time or permanently, with a reason. Banning signs them out everywhere and blocks sign-in until the ban is lifted or expires.
+- See and revoke their **sessions**.
+- Set a new **password**, or give a Google-only user one.
+- **Delete** them. When billing is enabled, active Stripe subscriptions are canceled first, same as self-service deletion (the cleanup runs in a `databaseHooks.user.delete` hook, which covers both paths).
+
+Admins can't take these actions on their own account.
+
+### Managing admins
+
+Admins are defined only by `ADMIN_EMAILS`, a comma-separated list of addresses (in `.env` locally, or in the host environment in production). Roles can't be changed from the portal; to add or remove an admin, edit the variable and restart or redeploy.
+
+A listed user is an admin once their email is verified: Google accounts are verified on sign-up, email/password accounts once the verification link is clicked. Without `RESEND_API_KEY` in production, verification emails can't be sent, so admins need to sign in with Google there.
+
+The role is stored on the user and kept in sync by `src/lib/admin-role.ts`: it's set on sign-up, re-checked on every user update (so verifying or changing an email applies immediately), and re-applied to all users at server startup via `src/instrumentation.ts`, which is how removals from the list take effect.
+
+To add finer-grained roles (e.g. support staff who can impersonate but not delete), define them with `createAccessControl`, pass `ac`/`roles` to both `admin()` in `src/lib/auth.ts` and `adminClient()` in `src/lib/auth-client.ts`, and extend `roleFor()` in `src/lib/admin-role.ts` to assign them.
 
 ## Rate limiting
 
@@ -221,11 +248,12 @@ prisma/
 src/
   app/
     (auth)/            sign-in, sign-up, password reset
-    (app)/             signed-in pages: dashboard, settings
+    (app)/             signed-in pages: dashboard, settings, admin
     api/auth/          Better Auth handler
   components/          React components (+ colocated tests)
   lib/                 auth, session helpers, entitlements, email, plans, Prisma client
   proxy.ts             optimistic redirect for signed-out visitors
+  instrumentation.ts   syncs admin roles with ADMIN_EMAILS at startup
   env.ts               environment schema
   generated/prisma/    generated Prisma client (gitignored)
 ```

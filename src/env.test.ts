@@ -28,6 +28,7 @@ const isolatedKeys = [
   "STRIPE_PRICE_BASIC_ANNUAL",
   "STRIPE_PRICE_PRO_MONTHLY",
   "STRIPE_PRICE_PRO_ANNUAL",
+  "ADMIN_EMAILS",
 ];
 
 const loadEnv = async (values: Record<string, string>) => {
@@ -117,6 +118,28 @@ describe("env", () => {
   it("rejects a malformed Resend API key", async () => {
     await expect(
       loadEnv({ ...baseEnv, RESEND_API_KEY: "sk_123" }),
+    ).rejects.toThrow("Invalid environment variables");
+  });
+
+  it("parses admin emails into a normalized list", async () => {
+    const env = await loadEnv({
+      ...baseEnv,
+      ADMIN_EMAILS: "admin@example.com, Other@Example.com,",
+    });
+    expect(env.ADMIN_EMAILS).toEqual([
+      "admin@example.com",
+      "other@example.com",
+    ]);
+  });
+
+  it("defaults admin emails to an empty list", async () => {
+    const env = await loadEnv(baseEnv);
+    expect(env.ADMIN_EMAILS).toEqual([]);
+  });
+
+  it("rejects a malformed admin emails entry", async () => {
+    await expect(
+      loadEnv({ ...baseEnv, ADMIN_EMAILS: "not-an-email" }),
     ).rejects.toThrow("Invalid environment variables");
   });
 });

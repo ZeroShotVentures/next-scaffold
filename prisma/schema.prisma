@@ -16,6 +16,10 @@ model User {
   createdAt        DateTime
   updatedAt        DateTime
   stripeCustomerId String?
+  role             String?
+  banned           Boolean?  @default(false)
+  banReason        String?
+  banExpires       DateTime?
 
   sessions Session[]
   accounts Account[]
@@ -24,13 +28,14 @@ model User {
 }
 
 model Session {
-  id        String   @id
-  expiresAt DateTime
-  token     String   @unique
-  createdAt DateTime
-  updatedAt DateTime
-  ipAddress String?
-  userAgent String?
+  id             String   @id
+  expiresAt      DateTime
+  token          String   @unique
+  createdAt      DateTime
+  updatedAt      DateTime
+  ipAddress      String?
+  userAgent      String?
+  impersonatedBy String?
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
