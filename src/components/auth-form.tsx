@@ -1,22 +1,31 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { signIn, signUp } from "@/lib/auth-client";
+import { defaultRedirect } from "@/lib/redirect";
 
 type AuthFormProps = {
-  isSignUp: boolean;
-  onToggle: () => void;
+  mode: "sign-in" | "sign-up";
+  callbackURL: string;
   googleEnabled: boolean;
   emailEnabled: boolean;
 };
 
 export function AuthForm({
-  isSignUp,
-  onToggle,
+  mode,
+  callbackURL,
   googleEnabled,
   emailEnabled,
 }: AuthFormProps) {
+  const router = useRouter();
+  const isSignUp = mode === "sign-up";
+  const togglePath = isSignUp ? "/sign-in" : "/sign-up";
+  const toggleHref =
+    callbackURL === defaultRedirect
+      ? togglePath
+      : `${togglePath}?${new URLSearchParams({ callbackURL })}`;
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,20 +38,19 @@ export function AuthForm({
     setLoading(true);
 
     try {
-      if (isSignUp) {
-        const res = await signUp.email({ name, email, password });
-        if (res.error) {
-          setError(res.error.message ?? "Sign up failed");
-        }
-      } else {
-        const res = await signIn.email({ email, password });
-        if (res.error) {
-          setError(res.error.message ?? "Sign in failed");
-        }
+      const res = isSignUp
+        ? await signUp.email({ name, email, password })
+        : await signIn.email({ email, password });
+      if (res.error) {
+        setError(
+          res.error.message ?? (isSignUp ? "Sign up failed" : "Sign in failed"),
+        );
+        setLoading(false);
+        return;
       }
+      router.replace(callbackURL);
     } catch {
       setError("Something went wrong");
-    } finally {
       setLoading(false);
     }
   };
@@ -52,7 +60,7 @@ export function AuthForm({
     setLoading(true);
 
     try {
-      const res = await signIn.social({ provider: "google", callbackURL: "/" });
+      const res = await signIn.social({ provider: "google", callbackURL });
       if (res.error) {
         setError(res.error.message ?? "Google sign in failed");
         setLoading(false);
@@ -194,12 +202,12 @@ export function AuthForm({
 
       <div className="text-center text-sm text-zinc-500 dark:text-zinc-400">
         {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
-        <button
-          onClick={onToggle}
+        <Link
+          href={toggleHref}
           className="font-medium text-zinc-900 hover:underline dark:text-zinc-50"
         >
           {isSignUp ? "Sign in" : "Sign up"}
-        </button>
+        </Link>
       </div>
     </div>
   );

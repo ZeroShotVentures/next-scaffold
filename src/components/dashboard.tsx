@@ -1,20 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { sendVerificationEmail, subscription } from "@/lib/auth-client";
 import {
-  sendVerificationEmail,
-  signOut,
-  subscription,
-} from "@/lib/auth-client";
-import { type SubscriptionPlan, subscriptionPlans } from "@/lib/plans";
+  freePlan,
+  type SubscriptionPlan,
+  subscriptionPlans,
+} from "@/lib/plans";
 
-type SessionLike = {
-  user: {
-    id: string;
-    email: string;
-    emailVerified: boolean;
-    name?: string | null;
-  };
+type DashboardUser = {
+  email: string;
+  emailVerified: boolean;
 };
 
 type ActiveSubscription = {
@@ -28,15 +24,17 @@ type ActiveSubscription = {
 };
 
 type DashboardProps = {
-  session: SessionLike;
+  user: DashboardUser;
   billingEnabled: boolean;
   emailEnabled: boolean;
+  checkout: "success" | "canceled" | null;
 };
 
 export function Dashboard({
-  session,
+  user,
   billingEnabled,
   emailEnabled,
+  checkout,
 }: DashboardProps) {
   const [annual, setAnnual] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
@@ -82,8 +80,8 @@ export function Dashboard({
       const { error: upgradeError } = await subscription.upgrade({
         plan: plan.name,
         annual,
-        successUrl: "/?success=true",
-        cancelUrl: "/?canceled=true",
+        successUrl: "/dashboard?checkout=success",
+        cancelUrl: "/dashboard?checkout=canceled",
         subscriptionId: active?.stripeSubscriptionId,
       });
       if (upgradeError) {
@@ -101,7 +99,7 @@ export function Dashboard({
     setManaging("portal");
     try {
       const { error: portalError } = await subscription.billingPortal({
-        returnUrl: "/",
+        returnUrl: "/dashboard",
       });
       if (portalError) {
         setError(portalError.message ?? "Unable to open billing portal");
@@ -118,8 +116,8 @@ export function Dashboard({
     setVerification("sending");
     try {
       const { error: sendError } = await sendVerificationEmail({
-        email: session.user.email,
-        callbackURL: "/",
+        email: user.email,
+        callbackURL: "/dashboard",
       });
       if (sendError) {
         setError(sendError.message ?? "Unable to send verification email");
@@ -139,7 +137,7 @@ export function Dashboard({
     setManaging("cancel");
     try {
       const { error: cancelError } = await subscription.cancel({
-        returnUrl: "/",
+        returnUrl: "/dashboard",
         subscriptionId: active.stripeSubscriptionId,
       });
       if (cancelError) {
@@ -153,204 +151,205 @@ export function Dashboard({
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
-      <div className="mx-auto max-w-5xl px-6 py-10">
-        <header className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-              Welcome back
-            </h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Signed in as{" "}
-              <span className="font-medium text-zinc-900 dark:text-zinc-50">
-                {session.user.email}
-              </span>
-            </p>
-          </div>
-          <button
-            onClick={() => signOut()}
-            className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
-          >
-            Sign out
-          </button>
-        </header>
+    <>
+      <header>
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          Welcome back
+        </h1>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Signed in as{" "}
+          <span className="font-medium text-zinc-900 dark:text-zinc-50">
+            {user.email}
+          </span>
+        </p>
+      </header>
 
-        {emailEnabled && !session.user.emailVerified && (
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
-            <p>
-              {verification === "sent"
-                ? "Verification email sent. Check your inbox."
-                : "Please verify your email address."}
-            </p>
-            {verification !== "sent" && (
-              <button
-                onClick={handleResendVerification}
-                disabled={verification === "sending"}
-                className="font-medium hover:underline disabled:opacity-50"
-              >
-                {verification === "sending"
-                  ? "Sending..."
-                  : "Resend verification email"}
-              </button>
-            )}
-          </div>
-        )}
+      {checkout === "success" && (
+        <p className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+          Thanks for subscribing! Your plan will appear below as soon as Stripe
+          confirms the payment.
+        </p>
+      )}
+      {checkout === "canceled" && (
+        <p className="mt-6 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+          Checkout canceled. You haven&apos;t been charged.
+        </p>
+      )}
 
-        {error && (
-          <p className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-            {error}
+      {emailEnabled && !user.emailVerified && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+          <p>
+            {verification === "sent"
+              ? "Verification email sent. Check your inbox."
+              : "Please verify your email address."}
           </p>
-        )}
+          {verification !== "sent" && (
+            <button
+              onClick={handleResendVerification}
+              disabled={verification === "sending"}
+              className="font-medium hover:underline disabled:opacity-50"
+            >
+              {verification === "sending"
+                ? "Sending..."
+                : "Resend verification email"}
+            </button>
+          )}
+        </div>
+      )}
 
-        {billingEnabled && (
-          <>
-            <section className="mt-10">
-              <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                Current subscription
-              </h2>
-              <div className="mt-3 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                {loadingActive ? (
-                  <p className="text-sm text-zinc-500">Loading...</p>
-                ) : active ? (
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                      <p className="text-lg font-semibold capitalize text-zinc-900 dark:text-zinc-50">
-                        {active.plan}
-                      </p>
-                      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                        Status:{" "}
-                        <span className="capitalize">{active.status}</span>
-                        {active.cancelAtPeriodEnd && " · cancels at period end"}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
+      {error && (
+        <p className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+          {error}
+        </p>
+      )}
+
+      {billingEnabled && (
+        <>
+          <section className="mt-10">
+            <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              Current subscription
+            </h2>
+            <div className="mt-3 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+              {loadingActive ? (
+                <p className="text-sm text-zinc-500">Loading...</p>
+              ) : active ? (
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <p className="text-lg font-semibold capitalize text-zinc-900 dark:text-zinc-50">
+                      {active.plan}
+                    </p>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                      Status:{" "}
+                      <span className="capitalize">{active.status}</span>
+                      {active.cancelAtPeriodEnd && " · cancels at period end"}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleBillingPortal}
+                      disabled={managing !== null}
+                      className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                    >
+                      {managing === "portal" ? "Opening..." : "Manage billing"}
+                    </button>
+                    {!active.cancelAtPeriodEnd && (
                       <button
-                        onClick={handleBillingPortal}
+                        onClick={handleCancel}
                         disabled={managing !== null}
-                        className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:bg-zinc-900 dark:text-red-400 dark:hover:bg-red-950"
                       >
-                        {managing === "portal"
-                          ? "Opening..."
-                          : "Manage billing"}
+                        {managing === "cancel" ? "Canceling..." : "Cancel"}
                       </button>
-                      {!active.cancelAtPeriodEnd && (
-                        <button
-                          onClick={handleCancel}
-                          disabled={managing !== null}
-                          className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:bg-zinc-900 dark:text-red-400 dark:hover:bg-red-950"
-                        >
-                          {managing === "cancel" ? "Canceling..." : "Cancel"}
-                        </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  You&apos;re on the {freePlan.displayName} plan. Choose a plan
+                  below to upgrade.
+                </p>
+              )}
+            </div>
+          </section>
+
+          <section className="mt-10">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                Plans
+              </h2>
+              <div className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white p-1 text-sm dark:border-zinc-800 dark:bg-zinc-900">
+                <button
+                  onClick={() => setAnnual(false)}
+                  className={`rounded-full px-3 py-1 transition-colors ${
+                    !annual
+                      ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
+                      : "text-zinc-600 dark:text-zinc-400"
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setAnnual(true)}
+                  className={`rounded-full px-3 py-1 transition-colors ${
+                    annual
+                      ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
+                      : "text-zinc-600 dark:text-zinc-400"
+                  }`}
+                >
+                  Annual
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              {subscriptionPlans.map((plan) => {
+                const isCurrent = active?.plan === plan.name;
+                const price =
+                  annual && plan.annualPrice !== undefined
+                    ? plan.annualPrice
+                    : plan.monthlyPrice;
+                const interval = annual ? "year" : "month";
+                return (
+                  <div
+                    key={plan.name}
+                    className="flex flex-col rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                          {plan.displayName}
+                        </h3>
+                        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                          {plan.description}
+                        </p>
+                      </div>
+                      {isCurrent && (
+                        <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                          Current
+                        </span>
                       )}
                     </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                    No active subscription. Choose a plan below to get started.
-                  </p>
-                )}
-              </div>
-            </section>
 
-            <section className="mt-10">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                  Plans
-                </h2>
-                <div className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white p-1 text-sm dark:border-zinc-800 dark:bg-zinc-900">
-                  <button
-                    onClick={() => setAnnual(false)}
-                    className={`rounded-full px-3 py-1 transition-colors ${
-                      !annual
-                        ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
-                        : "text-zinc-600 dark:text-zinc-400"
-                    }`}
-                  >
-                    Monthly
-                  </button>
-                  <button
-                    onClick={() => setAnnual(true)}
-                    className={`rounded-full px-3 py-1 transition-colors ${
-                      annual
-                        ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
-                        : "text-zinc-600 dark:text-zinc-400"
-                    }`}
-                  >
-                    Annual
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                {subscriptionPlans.map((plan) => {
-                  const isCurrent = active?.plan === plan.name;
-                  const price =
-                    annual && plan.annualPrice !== undefined
-                      ? plan.annualPrice
-                      : plan.monthlyPrice;
-                  const interval = annual ? "year" : "month";
-                  return (
-                    <div
-                      key={plan.name}
-                      className="flex flex-col rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-                            {plan.displayName}
-                          </h3>
-                          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                            {plan.description}
-                          </p>
-                        </div>
-                        {isCurrent && (
-                          <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
-                            Current
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-6 flex items-baseline gap-1">
-                        <span className="text-3xl font-semibold text-zinc-900 dark:text-zinc-50">
-                          ${price}
-                        </span>
-                        <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                          /{interval}
-                        </span>
-                      </div>
-
-                      <ul className="mt-6 space-y-2 text-sm text-zinc-600 dark:text-zinc-300">
-                        {plan.features.map((feature) => (
-                          <li key={feature} className="flex items-start gap-2">
-                            <span className="mt-0.5 text-zinc-900 dark:text-zinc-50">
-                              ✓
-                            </span>
-                            {feature}
-                          </li>
-                        ))}
-                      </ul>
-
-                      <button
-                        onClick={() => handleUpgrade(plan)}
-                        disabled={loadingPlan !== null || isCurrent}
-                        className="mt-8 w-full rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
-                      >
-                        {isCurrent
-                          ? "Current plan"
-                          : loadingPlan === plan.name
-                            ? "Redirecting..."
-                            : active
-                              ? `Switch to ${plan.displayName}`
-                              : `Subscribe to ${plan.displayName}`}
-                      </button>
+                    <div className="mt-6 flex items-baseline gap-1">
+                      <span className="text-3xl font-semibold text-zinc-900 dark:text-zinc-50">
+                        ${price}
+                      </span>
+                      <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                        /{interval}
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
-            </section>
-          </>
-        )}
-      </div>
-    </div>
+
+                    <ul className="mt-6 space-y-2 text-sm text-zinc-600 dark:text-zinc-300">
+                      {plan.features.map((feature) => (
+                        <li key={feature} className="flex items-start gap-2">
+                          <span className="mt-0.5 text-zinc-900 dark:text-zinc-50">
+                            ✓
+                          </span>
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <button
+                      onClick={() => handleUpgrade(plan)}
+                      disabled={loadingPlan !== null || isCurrent}
+                      className="mt-8 w-full rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                    >
+                      {isCurrent
+                        ? "Current plan"
+                        : loadingPlan === plan.name
+                          ? "Redirecting..."
+                          : active
+                            ? `Switch to ${plan.displayName}`
+                            : `Subscribe to ${plan.displayName}`}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </>
+      )}
+    </>
   );
 }

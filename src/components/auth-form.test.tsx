@@ -6,7 +6,7 @@ import { AuthForm } from "./auth-form";
 type AuthResult = { error: { message?: string } | null };
 type Credentials = { email: string; password: string };
 
-const { signIn, signUp } = vi.hoisted(() => ({
+const { signIn, signUp, router } = vi.hoisted(() => ({
   signIn: {
     email: vi.fn<(input: Credentials) => Promise<AuthResult>>(),
     social:
@@ -21,13 +21,15 @@ const { signIn, signUp } = vi.hoisted(() => ({
     email:
       vi.fn<(input: Credentials & { name: string }) => Promise<AuthResult>>(),
   },
+  router: { replace: vi.fn<(href: string) => void>() },
 }));
 
 vi.mock("@/lib/auth-client", () => ({ signIn, signUp }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 const defaultProps = {
-  isSignUp: false,
-  onToggle: vi.fn<() => void>(),
+  mode: "sign-in" as const,
+  callbackURL: "/dashboard",
   googleEnabled: false,
   emailEnabled: false,
 };
@@ -51,12 +53,15 @@ describe("AuthForm", () => {
       email: "jane@example.com",
       password: "hunter22",
     });
+    expect(router.replace).toHaveBeenCalledWith("/dashboard");
   });
 
   it("signs up with name, email and password", async () => {
     signUp.email.mockResolvedValue({ error: null });
     const user = userEvent.setup();
-    render(<AuthForm {...defaultProps} isSignUp />);
+    render(
+      <AuthForm {...defaultProps} mode="sign-up" callbackURL="/settings" />,
+    );
 
     await user.type(screen.getByLabelText("Name"), "Jane");
     await user.type(screen.getByLabelText("Email"), "jane@example.com");
@@ -68,6 +73,7 @@ describe("AuthForm", () => {
       email: "jane@example.com",
       password: "hunter22",
     });
+    expect(router.replace).toHaveBeenCalledWith("/settings");
   });
 
   it("shows the error returned by the auth client", async () => {
@@ -80,16 +86,27 @@ describe("AuthForm", () => {
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     expect(await screen.findByText("Invalid password")).toBeInTheDocument();
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
-  it("calls onToggle when switching modes", async () => {
-    const onToggle = vi.fn<() => void>();
-    const user = userEvent.setup();
-    render(<AuthForm {...defaultProps} onToggle={onToggle} />);
+  it("links to the other mode", () => {
+    render(<AuthForm {...defaultProps} />);
 
-    await user.click(screen.getByRole("button", { name: "Sign up" }));
+    expect(screen.getByRole("link", { name: "Sign up" })).toHaveAttribute(
+      "href",
+      "/sign-up",
+    );
+  });
 
-    expect(onToggle).toHaveBeenCalledOnce();
+  it("keeps the callback URL when switching modes", () => {
+    render(
+      <AuthForm {...defaultProps} mode="sign-up" callbackURL="/settings" />,
+    );
+
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+      "href",
+      "/sign-in?callbackURL=%2Fsettings",
+    );
   });
 
   it("hides Google and password reset when disabled", () => {
@@ -120,7 +137,7 @@ describe("AuthForm", () => {
 
     expect(signIn.social).toHaveBeenCalledWith({
       provider: "google",
-      callbackURL: "/",
+      callbackURL: "/dashboard",
     });
   });
 });

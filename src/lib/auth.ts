@@ -1,6 +1,7 @@
 import { stripe } from "@better-auth/stripe";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { nextCookies } from "better-auth/next-js";
 import { Stripe } from "stripe";
 import { env } from "@/env";
 import { sendEmail } from "./email";
@@ -8,12 +9,12 @@ import { emailEnabled } from "./features";
 import { type PlanName, subscriptionPlans } from "./plans";
 import { prisma } from "./prisma";
 
-const billingPlugins = () => {
-  if (!env.BILLING_ENABLED) return [];
+const stripeClient = env.BILLING_ENABLED
+  ? new Stripe(env.STRIPE_SECRET_KEY, { apiVersion: "2026-08-26.dahlia" })
+  : null;
 
-  const stripeClient = new Stripe(env.STRIPE_SECRET_KEY, {
-    apiVersion: "2026-08-26.dahlia",
-  });
+const billingPlugins = () => {
+  if (!env.BILLING_ENABLED || !stripeClient) return [];
 
   const stripePrices: Record<
     PlanName,
@@ -47,12 +48,38 @@ const billingPlugins = () => {
   ];
 };
 
+const endedStatuses = ["canceled", "incomplete_expired"];
+
+// The Stripe plugin does not react to user deletion, and Stripe keeps charging
+// live subscriptions whose user no longer exists.
+async function cancelSubscriptions(userId: string) {
+  if (!stripeClient) return;
+  const live = await prisma.subscription.findMany({
+    where: {
+      referenceId: userId,
+      status: { notIn: endedStatuses },
+      stripeSubscriptionId: { not: null },
+    },
+    select: { stripeSubscriptionId: true },
+  });
+  await Promise.all(
+    live.map(({ stripeSubscriptionId }) =>
+      stripeSubscriptionId
+        ? stripeClient.subscriptions.cancel(stripeSubscriptionId)
+        : null,
+    ),
+  );
+}
+
 export const auth = betterAuth({
   secret: env.BETTER_AUTH_SECRET,
   baseURL: env.BETTER_AUTH_URL,
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
+  rateLimit: {
+    storage: "database",
+  },
   emailAndPassword: {
     enabled: true,
     revokeSessionsOnPasswordReset: true,
@@ -79,6 +106,29 @@ export const auth = betterAuth({
         },
       }
     : undefined,
+  user: {
+    changeEmail: {
+      enabled: emailEnabled,
+      sendChangeEmailConfirmation: async ({ user, newEmail, url }) => {
+        await sendEmail({
+          to: user.email,
+          subject: "Confirm your email change",
+          text: `Someone asked to change your email address to ${newEmail}. Click the link below to approve the change.\n\n${url}\n\nIf this wasn't you, ignore this email and change your password.`,
+        });
+      },
+    },
+    deleteUser: {
+      enabled: true,
+      beforeDelete: async (user) => {
+        await cancelSubscriptions(user.id);
+      },
+      afterDelete: async (user) => {
+        await prisma.subscription.deleteMany({
+          where: { referenceId: user.id },
+        });
+      },
+    },
+  },
   socialProviders:
     env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
       ? {
@@ -88,5 +138,6 @@ export const auth = betterAuth({
           },
         }
       : undefined,
-  plugins: billingPlugins(),
+  // nextCookies must stay last so it sees cookies set by the other plugins.
+  plugins: [...billingPlugins(), nextCookies()],
 });
