@@ -6,7 +6,6 @@ import { notFound } from "next/navigation";
 import { BanForm } from "@/components/admin/ban-form";
 import { ImpersonateButton } from "@/components/admin/impersonate-button";
 import { RemoveUser } from "@/components/admin/remove-user";
-import { RoleForm } from "@/components/admin/role-form";
 import { SetPasswordForm } from "@/components/admin/set-password-form";
 import { UserBadges } from "@/components/admin/user-badges";
 import { Section } from "@/components/settings/section";
@@ -120,13 +119,6 @@ export default async function Page({
             ) : (
               <ImpersonateButton userId={target.id} />
             )}
-          </Section>
-
-          <Section
-            title="Role"
-            description="Admins can access this portal and manage every user."
-          >
-            <RoleForm userId={target.id} role={target.role ?? "user"} />
           </Section>
 
           <Section

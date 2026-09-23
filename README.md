@@ -48,6 +48,7 @@ All variables are declared and validated in `src/env.ts`. The app refuses to bui
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth client. Sign in with Google is enabled when both are set. |
 | `RESEND_API_KEY` | Resend API key (`re_...`). Without it, emails are logged to the console in development and email features are disabled in production. |
 | `EMAIL_FROM` | Sender for outgoing email, e.g. `my-app <hello@example.com>`. Must use a domain verified in Resend. |
+| `ADMIN_EMAILS` | Optional, comma-separated. The only way to make someone an admin: listed accounts are admins once their email is verified, everyone else is a regular user. |
 | `BILLING_ENABLED` | `true` to enable Stripe subscriptions. Defaults to `false`. |
 | `STRIPE_SECRET_KEY` | Stripe secret key (`sk_...`). Required when billing is enabled. |
 | `STRIPE_WEBHOOK_SECRET` | Webhook signing secret (`whsec_...`). Required when billing is enabled. |
@@ -87,7 +88,6 @@ Built on the Better Auth [admin plugin](https://www.better-auth.com/docs/plugins
 `/admin` lists users (newest first, searchable by email). `/admin/users/[id]` lets an admin:
 
 - **Impersonate** the user. The admin is signed in as them for up to an hour, with a banner and a "Stop impersonating" button that returns to the admin session. Impersonation sessions are hidden from the user's own session list. Other admins can't be impersonated.
-- Change their **role** (`user` or `admin`).
 - **Ban** them for a set time or permanently, with a reason. Banning signs them out everywhere and blocks sign-in until the ban is lifted or expires.
 - See and revoke their **sessions**.
 - Set a new **password**, or give a Google-only user one.
@@ -95,17 +95,15 @@ Built on the Better Auth [admin plugin](https://www.better-auth.com/docs/plugins
 
 Admins can't take these actions on their own account.
 
-### Creating the first admin
+### Managing admins
 
-Better Auth only lets admins assign roles, so promote the first one from the command line after they sign up:
+Admins are defined only by `ADMIN_EMAILS`, a comma-separated list of addresses (in `.env` locally, or in the host environment in production). Roles can't be changed from the portal; to add or remove an admin, edit the variable and restart or redeploy.
 
-```bash
-pnpm admin:grant you@example.com
-```
+A listed user is an admin once their email is verified: Google accounts are verified on sign-up, email/password accounts once the verification link is clicked. Without `RESEND_API_KEY` in production, verification emails can't be sent, so admins need to sign in with Google there.
 
-It reads `DATABASE_URL` the same way the Prisma CLI does (`.env`, then `.env.example`); for production, run it with `DATABASE_URL` pointing at the production database. Further admins can be promoted from the portal.
+The role is stored on the user and kept in sync by `src/lib/admin-role.ts`: it's set on sign-up, re-checked on every user update (so verifying or changing an email applies immediately), and re-applied to all users at server startup via `src/instrumentation.ts`, which is how removals from the list take effect.
 
-To add finer-grained roles (e.g. support staff who can impersonate but not delete), define them with `createAccessControl` and pass `ac`/`roles` to both `admin()` in `src/lib/auth.ts` and `adminClient()` in `src/lib/auth-client.ts`.
+To add finer-grained roles (e.g. support staff who can impersonate but not delete), define them with `createAccessControl`, pass `ac`/`roles` to both `admin()` in `src/lib/auth.ts` and `adminClient()` in `src/lib/auth-client.ts`, and extend `roleFor()` in `src/lib/admin-role.ts` to assign them.
 
 ## Rate limiting
 
@@ -225,7 +223,6 @@ Stripe keeps charging active subscriptions after you disable billing, but the we
 | `pnpm db:push` | Push the schema without a migration (prototyping only) |
 | `pnpm db:studio` | Open Prisma Studio |
 | `pnpm db:generate` | Regenerate the Prisma client (also runs on install) |
-| `pnpm admin:grant <email>` | Make an existing user an admin |
 
 The pre-commit hook runs oxlint and Biome on staged files.
 
@@ -256,8 +253,7 @@ src/
   components/          React components (+ colocated tests)
   lib/                 auth, session helpers, entitlements, email, plans, Prisma client
   proxy.ts             optimistic redirect for signed-out visitors
-scripts/
-  grant-admin.mts      promote the first admin
+  instrumentation.ts   syncs admin roles with ADMIN_EMAILS at startup
   env.ts               environment schema
   generated/prisma/    generated Prisma client (gitignored)
 ```

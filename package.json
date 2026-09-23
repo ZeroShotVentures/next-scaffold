@@ -21,7 +21,6 @@
     "db:reset": "prisma migrate reset",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "admin:grant": "node scripts/grant-admin.mts",
     "postinstall": "prisma generate",
     "prepare": "husky"
   },

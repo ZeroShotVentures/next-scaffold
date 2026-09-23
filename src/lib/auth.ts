@@ -5,6 +5,7 @@ import { nextCookies } from "better-auth/next-js";
 import { admin } from "better-auth/plugins";
 import { Stripe } from "stripe";
 import { env } from "@/env";
+import { roleFor } from "./admin-role";
 import { sendEmail } from "./email";
 import { emailEnabled } from "./features";
 import { type PlanName, subscriptionPlans } from "./plans";
@@ -126,6 +127,19 @@ export const auth = betterAuth({
   // removes a user.
   databaseHooks: {
     user: {
+      create: {
+        before: async (user) => ({ data: { role: roleFor(user) } }),
+      },
+      // Every user write (email verification, email change, the admin plugin's
+      // role endpoints) goes through here, so the role can't drift from
+      // ADMIN_EMAILS. Writes through Prisma skip the hook and don't recurse.
+      update: {
+        after: async (user) => {
+          const role = roleFor(user);
+          if ((user as { role?: string | null }).role === role) return;
+          await prisma.user.update({ where: { id: user.id }, data: { role } });
+        },
+      },
       delete: {
         before: async (user) => {
           await cancelSubscriptions(user.id);
