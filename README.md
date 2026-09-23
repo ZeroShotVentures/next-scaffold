@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# my-app
 
-## Getting Started
+Next.js scaffold with authentication, Stripe subscriptions and Postgres.
 
-First, run the development server:
+## Stack
+
+- [Next.js 16](https://nextjs.org) (App Router) with React 19 and Tailwind CSS 4
+- [Better Auth](https://www.better-auth.com) for email/password auth, with the Stripe plugin for subscriptions
+- [Prisma 7](https://www.prisma.io) on PostgreSQL (via `@prisma/adapter-pg`)
+- [t3-env](https://env.t3.gg) + [Zod](https://zod.dev) for typed, validated environment variables
+- [oxlint](https://oxc.rs/docs/guide/usage/linter) for linting, [Biome](https://biomejs.dev) for formatting and import sorting
+- [Vitest](https://vitest.dev) + [Testing Library](https://testing-library.com) for unit tests
+- [Husky](https://typicode.github.io/husky) + [lint-staged](https://github.com/lint-staged/lint-staged) for pre-commit checks
+
+## Prerequisites
+
+- Node.js 24 (see `.nvmrc`)
+- pnpm 12 (version pinned in `package.json`)
+- Docker (for the local database)
+- [Stripe CLI](https://docs.stripe.com/stripe-cli) (for local webhooks)
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+cp .env.example .env   # then fill in the values
+pnpm db:up             # start Postgres in Docker
+pnpm db:migrate        # apply migrations
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+All variables are declared and validated in `src/env.ts`. The app refuses to build or start when one is missing or malformed, and prints which one. Import `env` from `@/env` instead of reading `process.env` directly.
 
-## Learn More
+| Variable | Description |
+| --- | --- |
+| `DATABASE_URL` | Postgres connection string. The default matches `docker-compose.yml`. |
+| `BETTER_AUTH_SECRET` | At least 32 characters. Generate with `openssl rand -base64 32`. |
+| `BETTER_AUTH_URL` | Base URL of the app, e.g. `http://localhost:3000`. |
+| `STRIPE_SECRET_KEY` | Stripe secret key (`sk_...`). |
+| `STRIPE_WEBHOOK_SECRET` | Webhook signing secret (`whsec_...`), see below. |
+| `STRIPE_PRICE_*` | Stripe price IDs (`price_...`) per plan. Annual prices are optional. |
 
-To learn more about Next.js, take a look at the following resources:
+### Stripe webhooks
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Forward Stripe events to the local Better Auth webhook endpoint:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+stripe listen --forward-to localhost:3000/api/auth/stripe/webhook
+```
 
-## Deploy on Vercel
+Copy the printed `whsec_...` secret into `STRIPE_WEBHOOK_SECRET`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Plans (display data and limits) are defined in `src/lib/plans.ts`. Their Stripe price IDs are mapped from env in `src/lib/auth.ts`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Scripts
+
+| Script | Description |
+| --- | --- |
+| `pnpm dev` | Start the dev server |
+| `pnpm build` / `pnpm start` | Production build / serve |
+| `pnpm lint` | Run oxlint and check formatting with Biome |
+| `pnpm fix` | Auto-fix lint issues and format |
+| `pnpm typecheck` | Generate the Prisma client and run `tsc` |
+| `pnpm test` / `pnpm test:watch` | Run unit tests once / in watch mode |
+| `pnpm db:up` / `pnpm db:down` | Start / stop the Postgres container |
+| `pnpm db:migrate` | Create and apply a migration from schema changes (dev) |
+| `pnpm db:deploy` | Apply pending migrations (production) |
+| `pnpm db:reset` | Drop the database and re-apply all migrations |
+| `pnpm db:push` | Push the schema without a migration (prototyping only) |
+| `pnpm db:studio` | Open Prisma Studio |
+| `pnpm db:generate` | Regenerate the Prisma client (also runs on install) |
+
+The pre-commit hook runs oxlint and Biome on staged files.
+
+## Project structure
+
+```
+prisma/
+  schema.prisma        database schema
+  migrations/          SQL migrations
+src/
+  app/                 routes (App Router)
+  components/          React components (+ colocated tests)
+  lib/                 auth, Prisma client, plans
+  env.ts               environment schema
+  generated/prisma/    generated Prisma client (gitignored)
+```
