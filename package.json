@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
-    "db:push": "prisma db push"
+    "db:push": "prisma db push",
+    "prepare": "husky"
   },
   "dependencies": {
     "@better-auth/stripe": "1.6.5",
@@ -34,6 +35,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dotenv": "^17.4.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.5.1",
     "oxlint": "^1.83.0",
     "prisma": "^7.7.0",
     "tailwindcss": "^4",
