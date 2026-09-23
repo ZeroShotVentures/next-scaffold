@@ -1,11 +1,12 @@
 # my-app
 
-Next.js scaffold with authentication, Postgres and optional Stripe subscriptions.
+Next.js scaffold with authentication, Postgres, transactional email and optional Stripe subscriptions.
 
 ## Stack
 
 - [Next.js 16](https://nextjs.org) (App Router) with React 19 and Tailwind CSS 4
-- [Better Auth](https://www.better-auth.com) for email/password auth, with the Stripe plugin for subscriptions (off by default)
+- [Better Auth](https://www.better-auth.com) for email/password and Google sign-in, with the Stripe plugin for subscriptions (off by default)
+- [Resend](https://resend.com) for password reset and email verification emails
 - [Prisma 7](https://www.prisma.io) on PostgreSQL (via `@prisma/adapter-pg`)
 - [t3-env](https://env.t3.gg) + [Zod](https://zod.dev) for typed, validated environment variables
 - [oxlint](https://oxc.rs/docs/guide/usage/linter) for linting, [Biome](https://biomejs.dev) for formatting and import sorting
@@ -44,10 +45,36 @@ All variables are declared and validated in `src/env.ts`. The app refuses to bui
 | `DATABASE_URL` | Postgres connection string. The default matches `docker-compose.yml`. |
 | `BETTER_AUTH_SECRET` | At least 32 characters, required in production. Generate with `openssl rand -base64 32`. |
 | `BETTER_AUTH_URL` | Base URL of the app, e.g. `http://localhost:3000`. |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth client. Sign in with Google is enabled when both are set. |
+| `RESEND_API_KEY` | Resend API key (`re_...`). Without it, emails are logged to the console in development and email features are disabled in production. |
+| `EMAIL_FROM` | Sender for outgoing email, e.g. `my-app <hello@example.com>`. Must use a domain verified in Resend. |
 | `BILLING_ENABLED` | `true` to enable Stripe subscriptions. Defaults to `false`. |
 | `STRIPE_SECRET_KEY` | Stripe secret key (`sk_...`). Required when billing is enabled. |
 | `STRIPE_WEBHOOK_SECRET` | Webhook signing secret (`whsec_...`). Required when billing is enabled. |
 | `STRIPE_PRICE_*` | Stripe price IDs (`price_...`) per plan. Monthly prices are required when billing is enabled, annual prices are optional. |
+
+## Sign in with Google
+
+Off until `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. To set it up:
+
+1. In the [Google Cloud console](https://console.cloud.google.com/apis/credentials), configure the OAuth consent screen, then create an OAuth client ID of type "Web application".
+2. Add `http://localhost:3000/api/auth/callback/google` (and `https://<your-domain>/api/auth/callback/google` for production) as an authorized redirect URI.
+3. Copy the client ID and secret into `.env`.
+
+New Google users arrive with a verified email. If an email/password user with the same address already exists, Google sign-in links to that user only once they've verified their email; until then the Google sign-in is refused, which prevents account takeover through an unverified address.
+
+## Email
+
+Emails are sent through `sendEmail` in `src/lib/email.ts`. Better Auth uses it for:
+
+- **Password reset**: "Forgot password?" on the sign-in form leads to `/forgot-password`. The emailed link ends at `/reset-password`. Resetting revokes all existing sessions.
+- **Email verification**: sent on email/password sign-up. Verification is not required to sign in; the dashboard shows a banner with a resend button until the address is verified. To block unverified users, set `requireEmailVerification: true` in `src/lib/auth.ts`.
+
+Without `RESEND_API_KEY`, emails (including their links) are printed to the server console in development, so you can click through the flows locally. In production, email features are disabled when no key is set: there's no "Forgot password?" link and no verification emails, so reset links never end up in logs.
+
+To send real email, [verify a domain](https://resend.com/domains) in Resend, create an [API key](https://resend.com/api-keys) and set `RESEND_API_KEY` and `EMAIL_FROM`. Before a domain is verified, the default `onboarding@resend.dev` sender only delivers to your own Resend account address.
+
+Like the billing flag, whether Google and email are enabled is read at build time, so changing them requires a rebuild/redeploy.
 
 ## Billing
 
@@ -130,7 +157,7 @@ prisma/
 src/
   app/                 routes (App Router)
   components/          React components (+ colocated tests)
-  lib/                 auth, Prisma client, plans
+  lib/                 auth, email, feature flags, Prisma client, plans
   env.ts               environment schema
   generated/prisma/    generated Prisma client (gitignored)
 ```

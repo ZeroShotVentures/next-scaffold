@@ -80,4 +80,25 @@ describe("env", () => {
       }),
     ).rejects.toThrow("Invalid environment variables");
   });
+
+  it("accepts Google credentials", async () => {
+    const env = await loadEnv({
+      ...baseEnv,
+      GOOGLE_CLIENT_ID: "id",
+      GOOGLE_CLIENT_SECRET: "secret",
+    });
+    expect(env.GOOGLE_CLIENT_ID).toBe("id");
+  });
+
+  it("requires both Google credentials", async () => {
+    await expect(
+      loadEnv({ ...baseEnv, GOOGLE_CLIENT_ID: "id" }),
+    ).rejects.toThrow("Invalid environment variables");
+  });
+
+  it("rejects a malformed Resend API key", async () => {
+    await expect(
+      loadEnv({ ...baseEnv, RESEND_API_KEY: "sk_123" }),
+    ).rejects.toThrow("Invalid environment variables");
+  });
 });

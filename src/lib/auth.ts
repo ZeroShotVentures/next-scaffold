@@ -3,6 +3,8 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { Stripe } from "stripe";
 import { env } from "@/env";
+import { sendEmail } from "./email";
+import { emailEnabled } from "./features";
 import { type PlanName, subscriptionPlans } from "./plans";
 import { prisma } from "./prisma";
 
@@ -53,6 +55,38 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+    revokeSessionsOnPasswordReset: true,
+    sendResetPassword: emailEnabled
+      ? async ({ user, url }) => {
+          await sendEmail({
+            to: user.email,
+            subject: "Reset your password",
+            text: `Click the link below to reset your password. It expires in 1 hour.\n\n${url}\n\nIf you didn't request this, you can ignore this email.`,
+          });
+        }
+      : undefined,
   },
+  emailVerification: emailEnabled
+    ? {
+        sendOnSignUp: true,
+        autoSignInAfterVerification: true,
+        sendVerificationEmail: async ({ user, url }) => {
+          await sendEmail({
+            to: user.email,
+            subject: "Verify your email address",
+            text: `Click the link below to verify your email address.\n\n${url}`,
+          });
+        },
+      }
+    : undefined,
+  socialProviders:
+    env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+      ? {
+          google: {
+            clientId: env.GOOGLE_CLIENT_ID,
+            clientSecret: env.GOOGLE_CLIENT_SECRET,
+          },
+        }
+      : undefined,
   plugins: billingPlugins(),
 });
