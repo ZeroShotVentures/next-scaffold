@@ -15,7 +15,25 @@ const billingEnv = {
   STRIPE_PRICE_PRO_MONTHLY: "price_pro",
 };
 
+// Blanked before each load so values from the host (e.g. CI job env) don't leak in.
+const isolatedKeys = [
+  "BETTER_AUTH_SECRET",
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "RESEND_API_KEY",
+  "BILLING_ENABLED",
+  "STRIPE_SECRET_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+  "STRIPE_PRICE_BASIC_MONTHLY",
+  "STRIPE_PRICE_BASIC_ANNUAL",
+  "STRIPE_PRICE_PRO_MONTHLY",
+  "STRIPE_PRICE_PRO_ANNUAL",
+];
+
 const loadEnv = async (values: Record<string, string>) => {
+  for (const key of isolatedKeys) {
+    vi.stubEnv(key, "");
+  }
   for (const [key, value] of Object.entries(values)) {
     vi.stubEnv(key, value);
   }
