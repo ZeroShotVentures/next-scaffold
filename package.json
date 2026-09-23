@@ -7,7 +7,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "oxlint --deny-warnings && biome check",
+    "fix": "oxlint --fix && biome check --write",
+    "format": "biome format --write",
     "typecheck": "tsc --noEmit",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
@@ -25,14 +27,14 @@
     "stripe": "22.0.2"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^25",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dotenv": "^17.4.2",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.4",
+    "oxlint": "^1.83.0",
     "prisma": "^7.7.0",
     "tailwindcss": "^4",
     "typescript": "^6"

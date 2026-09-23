@@ -19,11 +19,7 @@ export const subscriptionPlans: SubscriptionPlan[] = [
     annualDiscountPriceId: process.env.STRIPE_PRICE_BASIC_ANNUAL,
     monthlyPrice: 9,
     annualPrice: 90,
-    features: [
-      "Up to 5 projects",
-      "10 GB storage",
-      "Community support",
-    ],
+    features: ["Up to 5 projects", "10 GB storage", "Community support"],
     limits: {
       projects: 5,
       storage: 10,

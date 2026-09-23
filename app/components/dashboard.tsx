@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { signOut, subscription } from "@/src/lib/auth-client";
-import { subscriptionPlans, type SubscriptionPlan } from "@/src/lib/plans";
+import { type SubscriptionPlan, subscriptionPlans } from "@/src/lib/plans";
 
 type SessionLike = {
   user: {
