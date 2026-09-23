@@ -44,6 +44,10 @@ export const env = createEnv({
     STRIPE_PRICE_BASIC_ANNUAL: priceId.optional(),
     STRIPE_PRICE_PRO_MONTHLY: priceId.optional(),
     STRIPE_PRICE_PRO_ANNUAL: priceId.optional(),
+    GOOGLE_CLIENT_ID: z.string().optional(),
+    GOOGLE_CLIENT_SECRET: z.string().optional(),
+    RESEND_API_KEY: z.string().startsWith("re_").optional(),
+    EMAIL_FROM: z.string().min(1),
   },
   client: {},
   experimental__runtimeEnv: {},
@@ -53,6 +57,16 @@ export const env = createEnv({
     z
       .object(shape)
       .superRefine((values, ctx) => {
+        if (!values.GOOGLE_CLIENT_ID !== !values.GOOGLE_CLIENT_SECRET) {
+          const missing = values.GOOGLE_CLIENT_ID
+            ? "GOOGLE_CLIENT_SECRET"
+            : "GOOGLE_CLIENT_ID";
+          ctx.addIssue({
+            code: "custom",
+            path: [missing],
+            message: "Set both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET",
+          });
+        }
         if (!values.BILLING_ENABLED) return;
         for (const key of requiredForBilling) {
           if (!values[key]) {
