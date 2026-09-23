@@ -52,6 +52,19 @@ describe("env", () => {
     ).rejects.toThrow("Invalid environment variables");
   });
 
+  it("uses a dev-only auth secret outside production", async () => {
+    const { BETTER_AUTH_SECRET: _, ...withoutSecret } = baseEnv;
+    const env = await loadEnv(withoutSecret);
+    expect(env.BETTER_AUTH_SECRET).toContain("dev-only");
+  });
+
+  it("requires an auth secret in production", async () => {
+    const { BETTER_AUTH_SECRET: _, ...withoutSecret } = baseEnv;
+    await expect(
+      loadEnv({ ...withoutSecret, NODE_ENV: "production" }),
+    ).rejects.toThrow("Invalid environment variables");
+  });
+
   it("rejects a short auth secret", async () => {
     await expect(
       loadEnv({ ...baseEnv, BETTER_AUTH_SECRET: "short" }),

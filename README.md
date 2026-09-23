@@ -23,7 +23,6 @@ Next.js scaffold with authentication, Postgres and optional Stripe subscriptions
 
 ```bash
 pnpm install
-cp .env.example .env   # then fill in the values
 pnpm db:up             # start Postgres in Docker
 pnpm db:migrate        # apply migrations
 pnpm dev
@@ -33,12 +32,17 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### Environment variables
 
+`.env.example` is committed and loaded automatically as the lowest-priority defaults, so local development works without any setup. To override a value locally, put it in `.env` (gitignored). In production, set real values in the host environment. Priority, highest first: host environment, `.env.local`, `.env`, `.env.example`. (Prisma CLI only reads `.env` and `.env.example`.)
+
 All variables are declared and validated in `src/env.ts`. The app refuses to build or start when one is missing or malformed, and prints which one. Import `env` from `@/env` instead of reading `process.env` directly.
+
+> [!IMPORTANT]
+> Never put secrets in `.env.example`. Outside production, `BETTER_AUTH_SECRET` falls back to a dev-only value; production builds and servers require a real one.
 
 | Variable | Description |
 | --- | --- |
 | `DATABASE_URL` | Postgres connection string. The default matches `docker-compose.yml`. |
-| `BETTER_AUTH_SECRET` | At least 32 characters. Generate with `openssl rand -base64 32`. |
+| `BETTER_AUTH_SECRET` | At least 32 characters, required in production. Generate with `openssl rand -base64 32`. |
 | `BETTER_AUTH_URL` | Base URL of the app, e.g. `http://localhost:3000`. |
 | `BILLING_ENABLED` | `true` to enable Stripe subscriptions. Defaults to `false`. |
 | `STRIPE_SECRET_KEY` | Stripe secret key (`sk_...`). Required when billing is enabled. |

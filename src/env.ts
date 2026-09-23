@@ -1,5 +1,11 @@
 import { createEnv } from "@t3-oss/env-nextjs";
+import { config } from "dotenv";
 import { z } from "zod";
+
+// Committed defaults. Never overrides variables that are already set (.env, .env.local, host env).
+config({ path: ".env.example", quiet: true });
+
+const authSecret = z.string().min(32);
 
 const priceId = z.string().startsWith("price_");
 
@@ -26,7 +32,10 @@ export const env = createEnv({
       .enum(["development", "test", "production"])
       .default("development"),
     DATABASE_URL: z.url(),
-    BETTER_AUTH_SECRET: z.string().min(32),
+    BETTER_AUTH_SECRET:
+      process.env.NODE_ENV === "production"
+        ? authSecret
+        : authSecret.default("dev-only-secret-never-use-in-production"),
     BETTER_AUTH_URL: z.url(),
     BILLING_ENABLED: z.stringbool().default(false),
     STRIPE_SECRET_KEY: z.string().startsWith("sk_").optional(),
