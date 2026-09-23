@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ResetPasswordForm } from "@/components/reset-password-form";
 import { emailEnabled } from "@/lib/features";
+
+export const metadata: Metadata = { title: "Set a new password" };
 
 export default async function Page({
   searchParams,
@@ -12,9 +15,5 @@ export default async function Page({
   const { token, error } = await searchParams;
   const validToken = typeof token === "string" && !error ? token : null;
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-zinc-950">
-      <ResetPasswordForm token={validToken} />
-    </div>
-  );
+  return <ResetPasswordForm token={validToken} />;
 }

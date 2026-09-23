@@ -1,5 +1,10 @@
 export type PlanName = "basic" | "pro";
 
+export type PlanLimits = {
+  projects: number;
+  storage: number;
+};
+
 export type SubscriptionPlan = {
   name: PlanName;
   displayName: string;
@@ -7,9 +12,18 @@ export type SubscriptionPlan = {
   monthlyPrice: number;
   annualPrice?: number;
   features: string[];
-  limits: Record<string, number>;
+  limits: PlanLimits;
 };
 
+export const freePlan = {
+  displayName: "Free",
+  limits: {
+    projects: 1,
+    storage: 1,
+  },
+} satisfies { displayName: string; limits: PlanLimits };
+
+// Ordered from lowest to highest tier; entitlements pick the last granted plan.
 export const subscriptionPlans: SubscriptionPlan[] = [
   {
     name: "basic",

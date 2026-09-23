@@ -88,7 +88,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
 
       <div className="text-center text-sm">
         <Link
-          href={token ? "/" : "/forgot-password"}
+          href={token ? "/sign-in" : "/forgot-password"}
           className="font-medium text-zinc-900 hover:underline dark:text-zinc-50"
         >
           {token ? "Back to sign in" : "Request a new link"}

@@ -81,7 +81,7 @@ export function ForgotPasswordForm() {
 
       <div className="text-center text-sm">
         <Link
-          href="/"
+          href="/sign-in"
           className="font-medium text-zinc-900 hover:underline dark:text-zinc-50"
         >
           Back to sign in

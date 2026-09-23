@@ -1,13 +1,6 @@
-import { Home } from "@/components/home";
-import { env } from "@/env";
-import { emailEnabled, googleEnabled } from "@/lib/features";
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/session";
 
-export default function Page() {
-  return (
-    <Home
-      billingEnabled={env.BILLING_ENABLED}
-      googleEnabled={googleEnabled}
-      emailEnabled={emailEnabled}
-    />
-  );
+export default async function Page() {
+  redirect((await getSession()) ? "/dashboard" : "/sign-in");
 }
