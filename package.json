@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "vercel-build": "node scripts/vercel-build.mts",
     "start": "next start",
     "lint": "oxlint --deny-warnings && biome check",
     "fix": "oxlint --fix && biome check --write",
