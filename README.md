@@ -212,6 +212,7 @@ Stripe keeps charging active subscriptions after you disable billing, but the we
 | --- | --- |
 | `pnpm dev` | Start the dev server |
 | `pnpm build` / `pnpm start` | Production build / serve |
+| `pnpm vercel-build` | Build used by Vercel: migrates on production deploys only, then builds |
 | `pnpm lint` | Run oxlint and check formatting with Biome |
 | `pnpm fix` | Auto-fix lint issues and format |
 | `pnpm typecheck` | Generate the Prisma client and run `tsc` |
@@ -238,6 +239,12 @@ The pre-commit hook runs oxlint and Biome on staged files.
 1. Set the production environment variables (at least `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`).
 2. Run `pnpm db:deploy` against the production database before (or as part of) each release.
 3. `pnpm build && pnpm start`, or let your host build the app.
+
+### Vercel
+
+Vercel runs `pnpm vercel-build` instead of `pnpm build`. It applies pending migrations (`prisma migrate deploy`) only when `VERCEL_ENV=production`, then runs `next build`. Preview and development deploys skip migrations, so a branch with a new migration can't change the production schema before it's merged. Leave the project's Build Command at its default; overriding it bypasses this script.
+
+Preview deploys still build against whatever `DATABASE_URL` the Preview environment has. If a branch's code depends on a schema change, point Preview at a separate database and migrate it yourself with `pnpm db:deploy`.
 
 ## Project structure
 
